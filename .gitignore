@@ -1,0 +1,70 @@
+# Python virtual environment
+.venv/
+env/
+venv/
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment files
+.env
+.env.*
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+.vs/
+
+# Logs and reports
+*.log
+reports/
+logs/
+
+# Build and distribution artifacts
+build/
+dist/
+*.egg-info/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary and backup files
+*.bak
+*.tmp
+*~
+
+# Project-specific files
+chat_history.json
+chat_history_*.json
+
+# Vector database and embeddings
+data/rag_db/
+data/chromadb/
+rag_chromadb/
+*.sqlite3
+
+# ML Models and embeddings
+models/
+sentence_transformers/
+*.bin
+*.pt
+*.pth
+
+# Documentation builds
+docs/_build/
+site/
+
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Local development
+*.local
+local_settings.py
