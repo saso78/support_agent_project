@@ -20,6 +20,9 @@ class Config:
     chunk_overlap: int
     system_prompts: Dict[str, str]
     history_file: str
+    temp_uploads_dir: str
+    kb_articles_dir: str
+    manuals_dir: str
 
     def __post_init__(self):
         if not self.api_key:
@@ -43,7 +46,10 @@ def load_config() -> Config:
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
         system_prompts=SYSTEM_PROMPTS,
-        history_file=HISTORY_FILE
+        history_file=HISTORY_FILE,
+        temp_uploads_dir=TEMP_UPLOADS_DIR,
+        kb_articles_dir=KB_ARTICLES_DIR,
+        manuals_dir=MANUALS_DIR
     )
 
 # API Configuration
@@ -83,6 +89,12 @@ SYSTEM_PROMPTS: Dict[str, str] = {
 # File paths
 HISTORY_FILE = os.path.join('data', 'chat_history', 'chat_history.json')
 
+# Define additional paths
+TEMP_UPLOADS_DIR = os.path.join('data', 'temp_uploads')
+KB_ARTICLES_DIR = os.path.join('data', 'kb_articles')
+MANUALS_DIR = os.path.join('data', 'manuals')
+
 # Create necessary directories
-os.makedirs(RAG_DB_DIR, exist_ok=True)
-os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+for directory in [RAG_DB_DIR, os.path.dirname(HISTORY_FILE), 
+                 TEMP_UPLOADS_DIR, KB_ARTICLES_DIR, MANUALS_DIR]:
+    os.makedirs(directory, exist_ok=True)

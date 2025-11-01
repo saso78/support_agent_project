@@ -1,6 +1,8 @@
 import streamlit as st
 from pathlib import Path
 import sys
+import tempfile
+import shutil
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -56,6 +58,51 @@ def main():
         st.session_state.messages = []
         st.session_state.memory.clear()
         st.rerun()
+
+    # Knowledge Base Management
+    with st.sidebar.expander("📚 Knowledge Base Management"):
+        st.write("Upload documents to the knowledge base:")
+        uploaded_files = st.file_uploader(
+            "Drop PDF or DOCX files here",
+            type=["pdf", "docx"],
+            accept_multiple_files=True,
+            help="Supports PDF and DOCX files"
+        )
+
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                # Create a temporary file to store the upload
+                temp_dir = Path("data/temp_uploads")
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_path = temp_dir / uploaded_file.name
+                
+                # Save uploaded file temporarily
+                with open(temp_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                
+                try:
+                    # Index the document
+                    with st.spinner(f"Indexing {uploaded_file.name}..."):
+                        docs_indexed = st.session_state.rag.index_document(str(temp_path))
+                        st.sidebar.success(f"✅ Successfully indexed {uploaded_file.name}")
+                except Exception as e:
+                    st.sidebar.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
+                finally:
+                    # Clean up temporary file
+                    temp_path.unlink(missing_ok=True)
+        
+        # Show collection info
+        try:
+            collection_info = st.session_state.rag.get_collection_info()
+            st.write("📊 Knowledge Base Stats:")
+            st.write(f"- Total Documents: {collection_info['total_documents']}")
+            st.write(f"- Total Chunks: {collection_info['total_chunks']}")
+            if collection_info['sources']:
+                st.write("📑 Available Sources:")
+                for source in collection_info['sources']:
+                    st.write(f"  - {Path(source).name}")
+        except Exception as e:
+            st.error(f"Error getting collection info: {str(e)}")
 
     # RAG query option
     with st.sidebar.expander("Knowledge Base Search"):
