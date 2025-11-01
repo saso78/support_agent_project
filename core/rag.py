@@ -266,27 +266,47 @@ class RAGSystem:
     def get_collection_info(self) -> Dict[str, Any]:
         """Get information about the current collection."""
         try:
+            # Get all items from collection
             items = self.collection.get()
+            if not items:
+                return {
+                    "total_chunks": 0,
+                    "total_documents": 0,
+                    "sources": [],
+                    "categories": {}
+                }
+
+            # Safely get IDs and metadata
+            ids = items.get('ids', [])
+            metadatas = items.get('metadatas', [])
             
             # Extract unique sources and categories
             sources = set()
             categories = {}
-            for metadata in items.get('metadatas', []): # type: ignore
-                if metadata:
-                    if 'source' in metadata:
-                        sources.add(metadata['source'])
-                    if 'category' in metadata:
-                        cat = metadata['category']
-                        categories[cat] = categories.get(cat, 0) + 1
+            
+            if metadatas:
+                for metadata in metadatas:
+                    if metadata:
+                        if 'source' in metadata:
+                            sources.add(metadata['source'])
+                        if 'category' in metadata:
+                            cat = metadata['category']
+                            categories[cat] = categories.get(cat, 0) + 1
 
             return {
-                "total_chunks": len(items['ids']),
+                "total_chunks": len(ids),
                 "total_documents": len(sources),
                 "sources": sorted(list(sources)),
                 "categories": categories
             }
         except Exception as e:
-            return {"error": str(e)}
+            print(f"Error getting collection info: {e}")  # Log the error
+            return {
+                "total_chunks": 0,
+                "total_documents": 0,
+                "sources": [],
+                "categories": {}
+            }
 
     def delete_document(self, source: str) -> bool:
         """Delete all chunks from a specific document."""

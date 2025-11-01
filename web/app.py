@@ -115,34 +115,56 @@ def main():
             st.write("🗂️ Manage Documents")
             try:
                 collection_info = st.session_state.rag.get_collection_info()
-                if collection_info['sources']:
-                    for source in collection_info['sources']:
+                sources = collection_info.get('sources', [])
+                
+                if not sources:
+                    st.info("No documents in the knowledge base yet")
+                else:
+                    for source in sources:
                         col1, col2, col3 = st.columns([3, 1, 1])
                         with col1:
                             st.write(Path(source).name)
                         with col2:
                             if st.button("🔄 Re-index", key=f"reindex_{source}"):
-                                category = next(
-                                    (k for k, v in collection_info.get('categories', {}).items() 
-                                     if source in v),
-                                    'other'
-                                )
+                                # Get the category for the document, default to 'other'
+                                categories = collection_info.get('categories', {})
+                                category = 'other'
+                                
+                                # Find the document's category
+                                for cat, count in categories.items():
+                                    if count > 0:  # If category has documents
+                                        try:
+                                            # Check if document exists in this category
+                                            results = st.session_state.rag.collection.get(
+                                                where={"source": source, "category": cat}
+                                            )
+                                            if results and results.get('ids', []):
+                                                category = cat
+                                                break
+                                        except Exception:
+                                            continue
+                                
                                 with st.spinner("Re-indexing..."):
                                     if st.session_state.rag.reindex_document(source, category):
                                         st.success("✅ Re-indexed successfully")
+                                        # Force refresh of the page to update the list
+                                        st.rerun()
                                     else:
                                         st.error("❌ Re-indexing failed")
+                        
                         with col3:
                             if st.button("🗑️ Delete", key=f"delete_{source}"):
                                 with st.spinner("Deleting..."):
                                     if st.session_state.rag.delete_document(source):
                                         st.success("✅ Deleted successfully")
+                                        # Force refresh of the page to update the list
+                                        st.rerun()
                                     else:
                                         st.error("❌ Deletion failed")
-                else:
-                    st.info("No documents in the knowledge base yet")
+                
             except Exception as e:
                 st.error(f"Error managing documents: {str(e)}")
+                st.error("Please try refreshing the page")
         
         # Stats Tab
         with tabs[2]:
