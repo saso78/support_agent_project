@@ -5,6 +5,28 @@ from dataclasses import dataclass
 
 load_dotenv()
 
+def get_secret(key: str, default=None):
+    """
+    Get secret from Streamlit secrets (cloud) or environment variables (local).
+    
+    Args:
+        key: The secret key to retrieve
+        default: Default value if key not found
+    
+    Returns:
+        The secret value or default
+    """
+    try:
+        import streamlit as st
+        # Try Streamlit secrets first (cloud deployment)
+        if key in st.secrets:
+            return st.secrets[key]
+    except (ImportError, FileNotFoundError, AttributeError):
+        pass
+    
+    # Fall back to environment variable (local development)
+    return os.getenv(key, default)
+
 @dataclass
 class Config:
     """Configuration class for the support agent."""
@@ -23,17 +45,23 @@ class Config:
     temp_uploads_dir: str
     kb_articles_dir: str
     manuals_dir: str
-    DOCUMENT_CATEGORIES: Dict[str, str]  # Added document categories
-
+    DOCUMENT_CATEGORIES: Dict[str, str]
+    
     def __post_init__(self):
         if not self.api_key:
-            raise ValueError("API key is required but none was provided")
+            raise ValueError(
+                "API key is required but none was provided. "
+                "Please set OPENROUTER_API_KEY in your .env file or Streamlit secrets."
+            )
 
 def load_config() -> Config:
     """Load and return the configuration."""
     api_key = OPENROUTER_API_KEY
     if not api_key:
-        raise ValueError("OPENROUTER_API_KEY not found in environment")
+        raise ValueError(
+            "OPENROUTER_API_KEY not found in environment. "
+            "Please add it to your .env file (local) or Streamlit secrets (cloud)."
+        )
         
     return Config(
         api_key=api_key,
@@ -54,8 +82,8 @@ def load_config() -> Config:
         DOCUMENT_CATEGORIES=DOCUMENT_CATEGORIES
     )
 
-# API Configuration
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# API Configuration - now reads from both .env and Streamlit secrets
+OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY")
 
 # Document Categories
 DOCUMENT_CATEGORIES = {
@@ -73,7 +101,6 @@ MODELS = [
     "mistralai/mistral-7b-instruct",
     "meta-llama/llama-3-8b-instruct",
 ]
-
 DEFAULT_MAX_TOKENS = 500
 DEFAULT_TEMPERATURE = 0.7
 
