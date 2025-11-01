@@ -1,0 +1,43 @@
+Technical Support Glossary
+
+ELD (Electronic Logging Device):
+A device that automatically records a driver's driving time and other aspects of Hours of Service (HOS) records. Connects directly to the vehicle's engine to track vehicle movement.
+
+HOS (Hours of Service):
+Federal regulations that govern the working hours of anyone operating a commercial motor vehicle. Key components include:
+- 11-Hour Driving Limit: May drive up to 11 hours after 10 consecutive hours off duty
+- 14-Hour Limit: May not drive beyond the 14th consecutive hour after coming on duty
+- Rest Break: Must take a 30-minute break when driving for more than 8 cumulative hours
+
+GPS Tracking:
+Real-time vehicle location monitoring system. Features include:
+- Live Position Updates: Current vehicle location updated every 2-3 minutes
+- Geofencing: Create virtual boundaries to monitor vehicle entry/exit
+- Route History: Review past vehicle movements and stops
+
+Vehicle Diagnostics:
+Engine data monitoring system that:
+- Reads engine fault codes
+- Monitors fuel consumption
+- Tracks engine hours and odometer readings
+- Reports maintenance needs
+
+Driver Status:
+Different duty status options in the ELD system:
+- On Duty (Driving): When operating the vehicle
+- On Duty (Not Driving): Working but not driving
+- Off Duty: Not working
+- Sleeper Berth: Resting in vehicle's sleeper compartment
+
+System Requirements:
+Minimum specifications for running the tracking software:
+- Internet: Stable broadband connection (minimum 5 Mbps)
+- Browser: Chrome 90+, Firefox 88+, or Edge 90+
+- Mobile App: iOS 13+ or Android 8+
+- Data: 500MB monthly data plan per vehicle
+
+Common Issues:
+- No Data Connection: Check cellular signal and device power
+- Login Failed: Verify credentials and internet connection
+- GPS Signal Loss: Ensure clear view of sky
+- Data Not Syncing: Check internet connection and refresh application

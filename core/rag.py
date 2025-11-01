@@ -59,42 +59,66 @@ class RAGSystem:
         return text
 
     def split_into_chunks(self, text: str, size: int = 1000) -> List[str]:
-        """Split text into smaller, more focused chunks."""
-        # Split into paragraphs first
-        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-        chunks = []
-        current_chunk = []
-        current_size = 0
+        """Split text into smaller, more focused chunks with header awareness."""
+        # Split into sections by headers first
+        sections = []
+        current_section = []
+        lines = text.split("\n")
         
-        for para in paragraphs:
-            para_size = len(para)
-            
-            # If this paragraph alone exceeds chunk size, split it into sentences
-            if para_size > size:
-                sentences = [s.strip() for s in para.replace("\n", " ").split(". ") if s.strip()]
-                for sentence in sentences:
-                    if len(sentence) > size:
-                        # If a sentence is too long, split it into smaller parts
-                        parts = [sentence[i:i+size] for i in range(0, len(sentence), size)]
-                        chunks.extend(parts)
-                    else:
-                        chunks.append(sentence)
+        for line in lines:
+            # Check if line is a header (ends with ':' and has no bullet points)
+            if line.strip().endswith(':') and not line.strip().startswith('-'):
+                # Store previous section if exists
+                if current_section:
+                    sections.append('\n'.join(current_section))
+                # Start new section
+                current_section = [line]
+            else:
+                current_section.append(line)
+        
+        # Add last section
+        if current_section:
+            sections.append('\n'.join(current_section))
+        
+        chunks = []
+        for section in sections:
+            # Skip empty sections
+            if not section.strip():
                 continue
                 
-            # If adding this paragraph would exceed chunk size, store current chunk and start new one
-            if current_size + para_size > size:
-                if current_chunk:
-                    chunks.append("\n\n".join(current_chunk))
-                current_chunk = [para]
-                current_size = para_size
-            else:
-                current_chunk.append(para)
-                current_size += para_size
-        
-        # Don't forget the last chunk
-        if current_chunk:
-            chunks.append("\n\n".join(current_chunk))
+            # If section is small enough, keep it as is
+            if len(section) <= size:
+                chunks.append(section)
+                continue
             
+            # For large sections, split into smaller parts but keep header
+            header = section.split('\n')[0] if ':' in section.split('\n')[0] else ""
+            body = section[len(header):] if header else section
+            
+            # Split body into smaller chunks
+            body_chunks = []
+            current_chunk = []
+            current_size = len(header) if header else 0
+            
+            for para in [p.strip() for p in body.split("\n") if p.strip()]:
+                if current_size + len(para) + 1 > size:
+                    if current_chunk:
+                        chunk_text = header + '\n' if header else ""
+                        chunk_text += '\n'.join(current_chunk)
+                        body_chunks.append(chunk_text)
+                    current_chunk = [para]
+                    current_size = len(header) + len(para)
+                else:
+                    current_chunk.append(para)
+                    current_size += len(para) + 1
+            
+            if current_chunk:
+                chunk_text = header + '\n' if header else ""
+                chunk_text += '\n'.join(current_chunk)
+                body_chunks.append(chunk_text)
+            
+            chunks.extend(body_chunks)
+        
         return chunks
 
 
