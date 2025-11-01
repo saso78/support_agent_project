@@ -61,48 +61,113 @@ def main():
 
     # Knowledge Base Management
     with st.sidebar.expander("📚 Knowledge Base Management"):
-        st.write("Upload documents to the knowledge base:")
-        uploaded_files = st.file_uploader(
-            "Drop PDF or DOCX files here",
-            type=["pdf", "docx"],
-            accept_multiple_files=True,
-            help="Supports PDF and DOCX files"
-        )
-
-        if uploaded_files:
-            for uploaded_file in uploaded_files:
-                # Create a temporary file to store the upload
-                temp_dir = Path("data/temp_uploads")
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                temp_path = temp_dir / uploaded_file.name
-                
-                # Save uploaded file temporarily
-                with open(temp_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                
-                try:
-                    # Index the document
-                    with st.spinner(f"Indexing {uploaded_file.name}..."):
-                        docs_indexed = st.session_state.rag.index_document(str(temp_path))
-                        st.sidebar.success(f"✅ Successfully indexed {uploaded_file.name}")
-                except Exception as e:
-                    st.sidebar.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
-                finally:
-                    # Clean up temporary file
-                    temp_path.unlink(missing_ok=True)
+        tabs = st.tabs(["Upload", "Manage", "Stats"])
         
-        # Show collection info
-        try:
-            collection_info = st.session_state.rag.get_collection_info()
-            st.write("📊 Knowledge Base Stats:")
-            st.write(f"- Total Documents: {collection_info['total_documents']}")
-            st.write(f"- Total Chunks: {collection_info['total_chunks']}")
-            if collection_info['sources']:
-                st.write("📑 Available Sources:")
-                for source in collection_info['sources']:
-                    st.write(f"  - {Path(source).name}")
-        except Exception as e:
-            st.error(f"Error getting collection info: {str(e)}")
+        # Upload Tab
+        with tabs[0]:
+            st.write("📤 Upload documents to the knowledge base:")
+            uploaded_files = st.file_uploader(
+                "Drop PDF or DOCX files here",
+                type=["pdf", "docx"],
+                accept_multiple_files=True,
+                help="Supports PDF and DOCX files"
+            )
+            
+            if uploaded_files:
+                category = st.selectbox(
+                    "Select document category",
+                    options=list(st.session_state.config.DOCUMENT_CATEGORIES.keys()),
+                    format_func=lambda x: st.session_state.config.DOCUMENT_CATEGORIES[x]
+                )
+                
+                for uploaded_file in uploaded_files:
+                    # Create a temporary file to store the upload
+                    temp_dir = Path(st.session_state.config.temp_uploads_dir)
+                    temp_dir.mkdir(parents=True, exist_ok=True)
+                    temp_path = temp_dir / uploaded_file.name
+                    
+                    # Save uploaded file temporarily
+                    with open(temp_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    try:
+                        # Show preview
+                        st.write("📄 Document Preview:")
+                        preview = st.session_state.rag.preview_document(str(temp_path))
+                        st.text_area("Content preview:", preview, height=100)
+                        
+                        if st.button(f"Index {uploaded_file.name}"):
+                            # Index the document
+                            with st.spinner(f"Indexing {uploaded_file.name}..."):
+                                docs_indexed = st.session_state.rag.index_document(
+                                    str(temp_path),
+                                    category=category
+                                )
+                                st.success(f"✅ Successfully indexed {uploaded_file.name}")
+                    except Exception as e:
+                        st.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
+                    finally:
+                        # Clean up temporary file
+                        temp_path.unlink(missing_ok=True)
+        
+        # Manage Tab
+        with tabs[1]:
+            st.write("🗂️ Manage Documents")
+            try:
+                collection_info = st.session_state.rag.get_collection_info()
+                if collection_info['sources']:
+                    for source in collection_info['sources']:
+                        col1, col2, col3 = st.columns([3, 1, 1])
+                        with col1:
+                            st.write(Path(source).name)
+                        with col2:
+                            if st.button("🔄 Re-index", key=f"reindex_{source}"):
+                                category = next(
+                                    (k for k, v in collection_info.get('categories', {}).items() 
+                                     if source in v),
+                                    'other'
+                                )
+                                with st.spinner("Re-indexing..."):
+                                    if st.session_state.rag.reindex_document(source, category):
+                                        st.success("✅ Re-indexed successfully")
+                                    else:
+                                        st.error("❌ Re-indexing failed")
+                        with col3:
+                            if st.button("🗑️ Delete", key=f"delete_{source}"):
+                                with st.spinner("Deleting..."):
+                                    if st.session_state.rag.delete_document(source):
+                                        st.success("✅ Deleted successfully")
+                                    else:
+                                        st.error("❌ Deletion failed")
+                else:
+                    st.info("No documents in the knowledge base yet")
+            except Exception as e:
+                st.error(f"Error managing documents: {str(e)}")
+        
+        # Stats Tab
+        with tabs[2]:
+            try:
+                collection_info = st.session_state.rag.get_collection_info()
+                st.write("📊 Knowledge Base Statistics")
+                
+                # Overall stats
+                st.metric("Total Documents", collection_info['total_documents'])
+                st.metric("Total Chunks", collection_info['total_chunks'])
+                
+                # Category breakdown
+                if collection_info.get('categories'):
+                    st.write("📑 Documents by Category:")
+                    for cat, count in collection_info['categories'].items():
+                        cat_name = st.session_state.config.DOCUMENT_CATEGORIES.get(cat, cat)
+                        st.write(f"- {cat_name}: {count}")
+                
+                # Source list
+                if collection_info['sources']:
+                    with st.expander("📚 Document List"):
+                        for source in collection_info['sources']:
+                            st.write(f"- {Path(source).name}")
+            except Exception as e:
+                st.error(f"Error getting collection info: {str(e)}")
 
     # RAG query option
     with st.sidebar.expander("Knowledge Base Search"):

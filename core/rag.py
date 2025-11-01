@@ -299,19 +299,113 @@ class RAGSystem:
         try:
             items = self.collection.get()
             
-            # Extract unique sources
+            # Extract unique sources and categories
             sources = set()
+            categories = {}
             for metadata in items.get('metadatas', []): # type: ignore
-                if metadata and 'source' in metadata:
-                    sources.add(metadata['source'])
+                if metadata:
+                    if 'source' in metadata:
+                        sources.add(metadata['source'])
+                    if 'category' in metadata:
+                        cat = metadata['category']
+                        categories[cat] = categories.get(cat, 0) + 1
 
             return {
                 "total_chunks": len(items['ids']),
                 "total_documents": len(sources),
-                "sources": sorted(list(sources))
+                "sources": sorted(list(sources)),
+                "categories": categories
             }
         except Exception as e:
             return {"error": str(e)}
+
+    def delete_document(self, source: str) -> bool:
+        """Delete all chunks from a specific document."""
+        try:
+            # Get all IDs for the document
+            results = self.collection.get(
+                where={"source": source}
+            )
+            if results and 'ids' in results:
+                self.collection.delete(
+                    ids=results['ids']
+                )
+            return True
+        except Exception as e:
+            print(f"❌ Error deleting document: {e}")
+            return False
+
+    def reindex_document(self, file_path: str, category: str) -> bool:
+        """Re-index an existing document."""
+        try:
+            # First delete existing chunks
+            self.delete_document(file_path)
+            # Then index again
+            self.index_document(file_path, category)
+            return True
+        except Exception as e:
+            print(f"❌ Error reindexing document: {e}")
+            return False
+
+    def index_document(self, file_path: str, category: str = "other") -> int:
+        """Process a document and add it to the vector store."""
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        # Extract text based on file type
+        if file_path.lower().endswith('.pdf'):
+            text = self.extract_text_from_pdf(file_path)
+        elif file_path.lower().endswith(('.txt', '.md', '.docx')):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        else:
+            raise ValueError(f"Unsupported file type: {file_path}")
+
+        if not text.strip():
+            raise ValueError("No text content extracted from document")
+
+        chunks = self.split_into_chunks(text)
+        successful = 0
+
+        # Delete existing chunks if any
+        self.delete_document(file_path)
+
+        for i, chunk in enumerate(chunks):
+            embedding = self.get_embedding(chunk)
+            if embedding is None:
+                continue
+
+            self.collection.add(
+                ids=[f"{os.path.basename(file_path)}_{i}"],
+                documents=[chunk],
+                embeddings=[embedding],
+                metadatas=[{
+                    "source": file_path,
+                    "chunk_index": i,
+                    "category": category,
+                    "filename": os.path.basename(file_path)
+                }]
+            )
+            successful += 1
+
+        return successful
+
+    def preview_document(self, file_path: str, max_chars: int = 500) -> str:
+        """Generate a preview of document content."""
+        try:
+            if file_path.lower().endswith('.pdf'):
+                text = self.extract_text_from_pdf(file_path)
+            else:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    text = f.read()
+
+            # Clean and truncate the text
+            preview = ' '.join(text.split())[:max_chars]
+            if len(text) > max_chars:
+                preview += "..."
+            return preview
+        except Exception as e:
+            return f"Error generating preview: {str(e)}"
 
     def clear_collection(self) -> bool:
         """Clear all documents from the collection."""

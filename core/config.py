@@ -23,6 +23,7 @@ class Config:
     temp_uploads_dir: str
     kb_articles_dir: str
     manuals_dir: str
+    DOCUMENT_CATEGORIES: Dict[str, str]  # Added document categories
 
     def __post_init__(self):
         if not self.api_key:
@@ -49,11 +50,22 @@ def load_config() -> Config:
         history_file=HISTORY_FILE,
         temp_uploads_dir=TEMP_UPLOADS_DIR,
         kb_articles_dir=KB_ARTICLES_DIR,
-        manuals_dir=MANUALS_DIR
+        manuals_dir=MANUALS_DIR,
+        DOCUMENT_CATEGORIES=DOCUMENT_CATEGORIES
     )
 
 # API Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+# Document Categories
+DOCUMENT_CATEGORIES = {
+    "manual": "Product Manuals",
+    "kb": "Knowledge Base Articles",
+    "guide": "User Guides",
+    "faq": "FAQs",
+    "policy": "Policies",
+    "other": "Other Documents"
+}
 
 # Model Configuration
 MODELS = [
