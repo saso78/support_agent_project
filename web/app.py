@@ -9,14 +9,32 @@ sys.path.append(str(project_root))
 from agents.support_agent import SupportAgent
 from core.memory import ConversationMemory
 from core.config import load_config
+from core.llm import OpenRouterLLM
+from core.rag import RAGSystem
 
 def initialize_session_state():
     """Initialize session state variables."""
+    if 'config' not in st.session_state:
+        st.session_state.config = load_config()
+    
     if 'memory' not in st.session_state:
         st.session_state.memory = ConversationMemory()
+    
+    if 'llm' not in st.session_state:
+        st.session_state.llm = OpenRouterLLM(
+            api_key=st.session_state.config.api_key
+        )
+    
+    if 'rag' not in st.session_state:
+        st.session_state.rag = RAGSystem()
+    
     if 'agent' not in st.session_state:
-        config = load_config()
-        st.session_state.agent = SupportAgent(config, st.session_state.memory)
+        st.session_state.agent = SupportAgent(
+            llm=st.session_state.llm,
+            memory=st.session_state.memory,
+            rag=st.session_state.rag
+        )
+    
     if 'messages' not in st.session_state:
         st.session_state.messages = []
 

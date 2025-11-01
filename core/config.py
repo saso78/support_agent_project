@@ -1,8 +1,50 @@
 import os
 from typing import Dict
 from dotenv import load_dotenv
+from dataclasses import dataclass
 
 load_dotenv()
+
+@dataclass
+class Config:
+    """Configuration class for the support agent."""
+    api_key: str
+    models: list[str]
+    max_tokens: int
+    temperature: float
+    max_history: int
+    rag_db_dir: str
+    rag_db_path: str
+    collection_name: str
+    chunk_size: int
+    chunk_overlap: int
+    system_prompts: Dict[str, str]
+    history_file: str
+
+    def __post_init__(self):
+        if not self.api_key:
+            raise ValueError("API key is required but none was provided")
+
+def load_config() -> Config:
+    """Load and return the configuration."""
+    api_key = OPENROUTER_API_KEY
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY not found in environment")
+        
+    return Config(
+        api_key=api_key,
+        models=MODELS,
+        max_tokens=DEFAULT_MAX_TOKENS,
+        temperature=DEFAULT_TEMPERATURE,
+        max_history=MAX_HISTORY_MESSAGES,
+        rag_db_dir=RAG_DB_DIR,
+        rag_db_path=RAG_DB_PATH,
+        collection_name=COLLECTION_NAME,
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        system_prompts=SYSTEM_PROMPTS,
+        history_file=HISTORY_FILE
+    )
 
 # API Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
