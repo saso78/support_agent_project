@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Chat Widget Demo</title>
+    <link rel="stylesheet" href="chat-widget.css">
+</head>
+<body>
+    <div style="max-width: 800px; margin: 40px auto; padding: 20px;">
+        <h1>Support Chat Widget Demo</h1>
+        <p>This page demonstrates the embedded support chat widget. Click the chat button in the bottom-right corner to start.</p>
+        
+        <h2>Integration Instructions</h2>
+        <pre><code>
+// Add to your HTML head
+&lt;script src="https://your-server.com/static/chat-widget.js"&gt;&lt;/script&gt;
+
+// Initialize the widget
+const supportChat = new SupportChatWidget({
+    serverUrl: 'https://your-server.com',
+    title: 'Support Chat',
+    placeholder: 'Type your message...',
+    position: 'right',
+    theme: 'light'
+});
+        </code></pre>
+    </div>
+
+    <script src="chat-widget.js"></script>
+    <script>
+        // Initialize the widget for demo
+        const supportChat = new SupportChatWidget({
+            serverUrl: 'http://localhost:8000',
+            title: 'Support Assistant',
+            placeholder: 'Ask me anything...'
+        });
+    </script>
+</body>
+</html>
