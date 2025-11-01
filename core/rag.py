@@ -97,38 +97,7 @@ class RAGSystem:
             
         return chunks
 
-    def index_document(self, file_path: str) -> int:
-        """Process a document and add it to the vector store."""
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {file_path}")
 
-        # Extract text based on file type
-        if file_path.lower().endswith('.pdf'):
-            text = self.extract_text_from_pdf(file_path)
-        else:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                text = f.read()
-
-        if not text.strip():
-            raise ValueError("No text content extracted from document")
-
-        chunks = self.split_into_chunks(text)
-        successful = 0
-
-        for i, chunk in enumerate(chunks):
-            embedding = self.get_embedding(chunk)
-            if embedding is None:
-                continue
-
-            self.collection.add(
-                ids=[f"{os.path.basename(file_path)}_{i}"],
-                documents=[chunk],
-                embeddings=[embedding],
-                metadatas=[{"source": file_path, "chunk_index": i}]
-            )
-            successful += 1
-
-        return successful
 
     def query(self, query_text: str, n_results: int = 5) -> str:
         """Query the knowledge base for relevant information."""
