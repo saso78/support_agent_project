@@ -58,11 +58,12 @@ def main():
         st.rerun()
 
     # RAG query option
-    with st.sidebar.expander("RAG Query"):
-        rag_query = st.text_input("Search knowledge base:")
+    with st.sidebar.expander("Knowledge Base Search"):
+        rag_query = st.text_input("Search:")
         if rag_query:
-            response = st.session_state.agent.process_command("/rag " + rag_query)
-            st.sidebar.write(response)
+            with st.spinner("Searching knowledge base..."):
+                response = st.session_state.rag.query(rag_query)
+                st.sidebar.write(response)
 
     # Main chat interface
     chat_container = st.container()
