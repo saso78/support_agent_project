@@ -1,11 +1,71 @@
 import os
 from typing import Dict
 from dotenv import load_dotenv
+from dataclasses import dataclass
 
 load_dotenv()
 
+@dataclass
+class Config:
+    """Configuration class for the support agent."""
+    api_key: str
+    models: list[str]
+    max_tokens: int
+    temperature: float
+    max_history: int
+    rag_db_dir: str
+    rag_db_path: str
+    collection_name: str
+    chunk_size: int
+    chunk_overlap: int
+    system_prompts: Dict[str, str]
+    history_file: str
+    temp_uploads_dir: str
+    kb_articles_dir: str
+    manuals_dir: str
+    DOCUMENT_CATEGORIES: Dict[str, str]  # Added document categories
+
+    def __post_init__(self):
+        if not self.api_key:
+            raise ValueError("API key is required but none was provided")
+
+def load_config() -> Config:
+    """Load and return the configuration."""
+    api_key = OPENROUTER_API_KEY
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY not found in environment")
+        
+    return Config(
+        api_key=api_key,
+        models=MODELS,
+        max_tokens=DEFAULT_MAX_TOKENS,
+        temperature=DEFAULT_TEMPERATURE,
+        max_history=MAX_HISTORY_MESSAGES,
+        rag_db_dir=RAG_DB_DIR,
+        rag_db_path=RAG_DB_PATH,
+        collection_name=COLLECTION_NAME,
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
+        system_prompts=SYSTEM_PROMPTS,
+        history_file=HISTORY_FILE,
+        temp_uploads_dir=TEMP_UPLOADS_DIR,
+        kb_articles_dir=KB_ARTICLES_DIR,
+        manuals_dir=MANUALS_DIR,
+        DOCUMENT_CATEGORIES=DOCUMENT_CATEGORIES
+    )
+
 # API Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+# Document Categories
+DOCUMENT_CATEGORIES = {
+    "manual": "Product Manuals",
+    "kb": "Knowledge Base Articles",
+    "guide": "User Guides",
+    "faq": "FAQs",
+    "policy": "Policies",
+    "other": "Other Documents"
+}
 
 # Model Configuration
 MODELS = [
@@ -41,6 +101,12 @@ SYSTEM_PROMPTS: Dict[str, str] = {
 # File paths
 HISTORY_FILE = os.path.join('data', 'chat_history', 'chat_history.json')
 
+# Define additional paths
+TEMP_UPLOADS_DIR = os.path.join('data', 'temp_uploads')
+KB_ARTICLES_DIR = os.path.join('data', 'kb_articles')
+MANUALS_DIR = os.path.join('data', 'manuals')
+
 # Create necessary directories
-os.makedirs(RAG_DB_DIR, exist_ok=True)
-os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+for directory in [RAG_DB_DIR, os.path.dirname(HISTORY_FILE), 
+                 TEMP_UPLOADS_DIR, KB_ARTICLES_DIR, MANUALS_DIR]:
+    os.makedirs(directory, exist_ok=True)

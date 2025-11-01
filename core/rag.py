@@ -59,76 +59,69 @@ class RAGSystem:
         return text
 
     def split_into_chunks(self, text: str, size: int = 1000) -> List[str]:
-        """Split text into smaller, more focused chunks."""
-        # Split into paragraphs first
-        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-        chunks = []
-        current_chunk = []
-        current_size = 0
+        """Split text into smaller, more focused chunks with header awareness."""
+        # Split into sections by headers first
+        sections = []
+        current_section = []
+        lines = text.split("\n")
         
-        for para in paragraphs:
-            para_size = len(para)
-            
-            # If this paragraph alone exceeds chunk size, split it into sentences
-            if para_size > size:
-                sentences = [s.strip() for s in para.replace("\n", " ").split(". ") if s.strip()]
-                for sentence in sentences:
-                    if len(sentence) > size:
-                        # If a sentence is too long, split it into smaller parts
-                        parts = [sentence[i:i+size] for i in range(0, len(sentence), size)]
-                        chunks.extend(parts)
-                    else:
-                        chunks.append(sentence)
+        for line in lines:
+            # Check if line is a header (ends with ':' and has no bullet points)
+            if line.strip().endswith(':') and not line.strip().startswith('-'):
+                # Store previous section if exists
+                if current_section:
+                    sections.append('\n'.join(current_section))
+                # Start new section
+                current_section = [line]
+            else:
+                current_section.append(line)
+        
+        # Add last section
+        if current_section:
+            sections.append('\n'.join(current_section))
+        
+        chunks = []
+        for section in sections:
+            # Skip empty sections
+            if not section.strip():
                 continue
                 
-            # If adding this paragraph would exceed chunk size, store current chunk and start new one
-            if current_size + para_size > size:
-                if current_chunk:
-                    chunks.append("\n\n".join(current_chunk))
-                current_chunk = [para]
-                current_size = para_size
-            else:
-                current_chunk.append(para)
-                current_size += para_size
-        
-        # Don't forget the last chunk
-        if current_chunk:
-            chunks.append("\n\n".join(current_chunk))
+            # If section is small enough, keep it as is
+            if len(section) <= size:
+                chunks.append(section)
+                continue
             
+            # For large sections, split into smaller parts but keep header
+            header = section.split('\n')[0] if ':' in section.split('\n')[0] else ""
+            body = section[len(header):] if header else section
+            
+            # Split body into smaller chunks
+            body_chunks = []
+            current_chunk = []
+            current_size = len(header) if header else 0
+            
+            for para in [p.strip() for p in body.split("\n") if p.strip()]:
+                if current_size + len(para) + 1 > size:
+                    if current_chunk:
+                        chunk_text = header + '\n' if header else ""
+                        chunk_text += '\n'.join(current_chunk)
+                        body_chunks.append(chunk_text)
+                    current_chunk = [para]
+                    current_size = len(header) + len(para)
+                else:
+                    current_chunk.append(para)
+                    current_size += len(para) + 1
+            
+            if current_chunk:
+                chunk_text = header + '\n' if header else ""
+                chunk_text += '\n'.join(current_chunk)
+                body_chunks.append(chunk_text)
+            
+            chunks.extend(body_chunks)
+        
         return chunks
 
-    def index_document(self, file_path: str) -> int:
-        """Process a document and add it to the vector store."""
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not found: {file_path}")
 
-        # Extract text based on file type
-        if file_path.lower().endswith('.pdf'):
-            text = self.extract_text_from_pdf(file_path)
-        else:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                text = f.read()
-
-        if not text.strip():
-            raise ValueError("No text content extracted from document")
-
-        chunks = self.split_into_chunks(text)
-        successful = 0
-
-        for i, chunk in enumerate(chunks):
-            embedding = self.get_embedding(chunk)
-            if embedding is None:
-                continue
-
-            self.collection.add(
-                ids=[f"{os.path.basename(file_path)}_{i}"],
-                documents=[chunk],
-                embeddings=[embedding],
-                metadatas=[{"source": file_path, "chunk_index": i}]
-            )
-            successful += 1
-
-        return successful
 
     def query(self, query_text: str, n_results: int = 5) -> str:
         """Query the knowledge base for relevant information."""
@@ -297,21 +290,135 @@ class RAGSystem:
     def get_collection_info(self) -> Dict[str, Any]:
         """Get information about the current collection."""
         try:
+            # Get all items from collection
             items = self.collection.get()
+            if not items:
+                return {
+                    "total_chunks": 0,
+                    "total_documents": 0,
+                    "sources": [],
+                    "categories": {}
+                }
+
+            # Safely get IDs and metadata
+            ids = items.get('ids', [])
+            metadatas = items.get('metadatas', [])
             
-            # Extract unique sources
+            # Extract unique sources and categories
             sources = set()
-            for metadata in items.get('metadatas', []): # type: ignore
-                if metadata and 'source' in metadata:
-                    sources.add(metadata['source'])
+            categories = {}
+            
+            if metadatas:
+                for metadata in metadatas:
+                    if metadata:
+                        if 'source' in metadata:
+                            sources.add(metadata['source'])
+                        if 'category' in metadata:
+                            cat = metadata['category']
+                            categories[cat] = categories.get(cat, 0) + 1
 
             return {
-                "total_chunks": len(items['ids']),
+                "total_chunks": len(ids),
                 "total_documents": len(sources),
-                "sources": sorted(list(sources))
+                "sources": sorted(list(sources)),
+                "categories": categories
             }
         except Exception as e:
-            return {"error": str(e)}
+            print(f"Error getting collection info: {e}")  # Log the error
+            return {
+                "total_chunks": 0,
+                "total_documents": 0,
+                "sources": [],
+                "categories": {}
+            }
+
+    def delete_document(self, source: str) -> bool:
+        """Delete all chunks from a specific document."""
+        try:
+            # Get all IDs for the document
+            results = self.collection.get(
+                where={"source": source}
+            )
+            if results and 'ids' in results:
+                self.collection.delete(
+                    ids=results['ids']
+                )
+            return True
+        except Exception as e:
+            print(f"❌ Error deleting document: {e}")
+            return False
+
+    def reindex_document(self, file_path: str, category: str) -> bool:
+        """Re-index an existing document."""
+        try:
+            # First delete existing chunks
+            self.delete_document(file_path)
+            # Then index again
+            self.index_document(file_path, category)
+            return True
+        except Exception as e:
+            print(f"❌ Error reindexing document: {e}")
+            return False
+
+    def index_document(self, file_path: str, category: str = "other") -> int:
+        """Process a document and add it to the vector store."""
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        # Extract text based on file type
+        if file_path.lower().endswith('.pdf'):
+            text = self.extract_text_from_pdf(file_path)
+        elif file_path.lower().endswith(('.txt', '.md', '.docx')):
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+        else:
+            raise ValueError(f"Unsupported file type: {file_path}")
+
+        if not text.strip():
+            raise ValueError("No text content extracted from document")
+
+        chunks = self.split_into_chunks(text)
+        successful = 0
+
+        # Delete existing chunks if any
+        self.delete_document(file_path)
+
+        for i, chunk in enumerate(chunks):
+            embedding = self.get_embedding(chunk)
+            if embedding is None:
+                continue
+
+            self.collection.add(
+                ids=[f"{os.path.basename(file_path)}_{i}"],
+                documents=[chunk],
+                embeddings=[embedding],
+                metadatas=[{
+                    "source": file_path,
+                    "chunk_index": i,
+                    "category": category,
+                    "filename": os.path.basename(file_path)
+                }]
+            )
+            successful += 1
+
+        return successful
+
+    def preview_document(self, file_path: str, max_chars: int = 500) -> str:
+        """Generate a preview of document content."""
+        try:
+            if file_path.lower().endswith('.pdf'):
+                text = self.extract_text_from_pdf(file_path)
+            else:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    text = f.read()
+
+            # Clean and truncate the text
+            preview = ' '.join(text.split())[:max_chars]
+            if len(text) > max_chars:
+                preview += "..."
+            return preview
+        except Exception as e:
+            return f"Error generating preview: {str(e)}"
 
     def clear_collection(self) -> bool:
         """Clear all documents from the collection."""
