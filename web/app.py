@@ -53,6 +53,28 @@ def main():
     # Initialize session state
     initialize_session_state()
 
+    # Add usage dashboard
+    with st.sidebar.expander("📊 Usage Dashboard", expanded=True):
+        from utils.usage_stats import usage_tracker
+        
+        # Get usage summary
+        stats = usage_tracker.get_summary()
+        
+        # Display metrics
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Messages", stats["total_messages"])
+            st.metric("Today's Messages", stats["today"]["total"])
+        with col2:
+            st.metric("Web Messages", stats["web_messages"])
+            st.metric("Widget Messages", stats["widget_messages"])
+        
+        # Show top queries
+        if stats["top_queries"]:
+            st.write("📈 Top Queries:")
+            for query, count in stats["top_queries"].items():
+                st.write(f"- {query} ({count}x)")
+
     # Sidebar options
     if st.sidebar.button("Clear Conversation"):
         st.session_state.messages = []
@@ -216,6 +238,10 @@ def main():
             with st.chat_message("user"):
                 st.write(prompt)
 
+            # Record the message
+            from utils.usage_stats import usage_tracker
+            usage_tracker.record_message(prompt, source="web")
+            
             # Get bot response
             with st.chat_message("assistant"):
                 response = st.session_state.agent.process_message(prompt)

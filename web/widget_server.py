@@ -58,16 +58,63 @@ def chat():
         logger.info("Processing chat request: %s", user_message)
 
         try:
-            # Get relevant information directly from RAG system
-            rag_response = rag_system.query(user_message)
-            logger.info("RAG response retrieved successfully")
+            # Record the message
+            from utils.usage_stats import usage_tracker
+            usage_tracker.record_message(user_message, source="widget")
             
-            if "No relevant information found" in rag_response:
-                # Only use agent if RAG has no direct answer
+            # For basic chat messages (greetings, short queries), just use agent
+            if len(user_message.split()) <= 2 or any(word in user_message.lower() for word in [
+                'hi', 'hello', 'hey', 'thanks', 'thank you', 'bye', 'goodbye'
+            ]):
                 response = agent.process_message(user_message)
+                logger.info("Simple greeting - using agent response only")
             else:
-                # Use RAG response directly
-                response = rag_response
+                # First try to get relevant information from RAG
+                rag_response = rag_system.query(user_message)
+                logger.info("RAG response retrieved")
+                
+                if "No relevant information found" in rag_response:
+                    # If no RAG info, use just the agent response
+                    response = agent.process_message(user_message)
+                    logger.info("No RAG info - using agent response only")
+                else:
+                    # If we have RAG info, provide it to the agent for context
+                    context_prompt = f"""Based on our documentation, here are the relevant details:
+{rag_response}
+
+Please provide a VERY CONCISE response using this information. Focus only on the most directly relevant information to answer the user's question. Do not include system requirements or other technical details unless specifically asked."""
+                    
+                    # Get agent response with RAG context
+                    agent_response = agent.process_message(context_prompt)
+                    logger.info("Generated contextualized agent response")
+                    
+                    # Extract only the most relevant part from RAG response
+                    if "📄 From test_glossary.txt:" in rag_response:
+                        sections = rag_response.split("📄 From test_glossary.txt:")
+                        # Get main section (first relevant hit)
+                        main_section = sections[1].split("\n\n")[0].strip()
+                        
+                        # Get related topics
+                        related_topics = []
+                        for section in sections[1:]:
+                            title = section.split(':')[0].strip()
+                            if title and title != "Common Issues" and title != "System Requirements":
+                                related_topics.append(title)
+                    else:
+                        main_section = rag_response
+                        related_topics = []
+
+                    # Create a concise response focusing on the main answer
+                    concise_response = f"{main_section}"
+                    
+                    # Add related topics as suggestions if available
+                    if related_topics:
+                        suggestions = "\n\n💡 Related topics you might be interested in:"
+                        for topic in related_topics[:3]:  # Limit to 3 suggestions
+                            suggestions += f"\n• Ask me about '{topic}'"
+                        concise_response += suggestions
+                    
+                    response = concise_response
             
             return jsonify({
                 'response': response,
