@@ -9,7 +9,7 @@ import json
 import logging
 from typing import Optional, List, Dict, Any
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
 
@@ -181,11 +181,11 @@ def get_calls(
         end_date: Filter calls before this date
         
     Returns:
-        List of Call objects
+        List of Call objects (with score relationship eagerly loaded)
     """
     session = get_session()
     try:
-        query = session.query(Call)
+        query = session.query(Call).options(joinedload(Call.score))
         
         if status:
             query = query.filter(Call.status == status)
@@ -196,7 +196,11 @@ def get_calls(
         if end_date:
             query = query.filter(Call.timestamp <= end_date)
         
-        return query.order_by(Call.timestamp.desc()).limit(limit).all()
+        calls = query.order_by(Call.timestamp.desc()).limit(limit).all()
+        # Expunge objects from session so they can be used after session closes
+        for call in calls:
+            session.expunge(call)
+        return calls
     finally:
         session.close()
 
@@ -418,12 +422,25 @@ def get_agent_performance(agent_id: int, days: int = 30) -> Dict[str, Any]:
         
         start_date = datetime.utcnow() - timedelta(days=days)
         
-        calls = session.query(Call).join(Score).filter(
+        calls = session.query(Call).options(joinedload(Call.score)).filter(
             Call.phone_number == agent.phone_number,
             Call.timestamp >= start_date
         ).all()
         
-        scores = [call.score.total for call in calls if call.score]
+        # Extract scores while session is active
+        scores = []
+        call_data = []
+        for call in calls:
+            try:
+                if call.score and call.score.total is not None:
+                    scores.append(call.score.total)
+                    call_data.append({
+                        "call_id": call.id,
+                        "timestamp": call.timestamp.isoformat() if call.timestamp else None,
+                        "score": call.score.total
+                    })
+            except Exception:
+                continue
         
         return {
             "agent_id": agent_id,
@@ -432,14 +449,7 @@ def get_agent_performance(agent_id: int, days: int = 30) -> Dict[str, Any]:
             "average_score": sum(scores) / len(scores) if scores else 0.0,
             "min_score": min(scores) if scores else 0.0,
             "max_score": max(scores) if scores else 0.0,
-            "calls": [
-                {
-                    "call_id": call.id,
-                    "timestamp": call.timestamp.isoformat(),
-                    "score": call.score.total if call.score else None
-                }
-                for call in calls
-            ]
+            "calls": call_data
         }
     finally:
         session.close()

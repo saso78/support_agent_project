@@ -116,13 +116,20 @@ def show_call_history():
     # Build dataframe
     data = []
     for call in calls:
-        score = call.score
+        # Safely access score attribute
+        score = None
+        try:
+            score = call.score
+        except Exception:
+            # Score not loaded or doesn't exist
+            pass
+        
         data.append({
             "ID": call.id,
-            "Phone": call.phone_number[-4:].rjust(4, '*'),  # Mask phone number
+            "Phone": call.phone_number[-4:].rjust(4, '*') if len(call.phone_number) >= 4 else "****",  # Mask phone number
             "Duration": f"{call.duration}s" if call.duration else "N/A",
-            "Status": call.status,
-            "Score": f"{score.total:.1f}" if score else "N/A",
+            "Status": call.status or "N/A",
+            "Score": f"{score.total:.1f}" if score and score.total is not None else "N/A",
             "Cost": f"${call.cost:.2f}" if call.cost else "$0.00",
             "Timestamp": call.timestamp.strftime("%Y-%m-%d %H:%M") if call.timestamp else "N/A"
         })
@@ -318,41 +325,55 @@ def show_analytics():
         st.info("No call data available for analytics.")
         return
     
-    # Score trends
-    scored_calls = [call for call in calls if call.score]
+    # Score trends - safely access scores
+    scored_calls = []
+    for call in calls:
+        try:
+            if call.score:
+                scored_calls.append(call)
+        except Exception:
+            continue
     
     if scored_calls:
         scores_data = {
-            "Date": [call.timestamp.strftime("%Y-%m-%d") for call in scored_calls],
-            "Total Score": [call.score.total for call in scored_calls],
-            "Greeting": [call.score.greeting for call in scored_calls],
-            "Resolution": [call.score.resolution for call in scored_calls],
-            "Tone": [call.score.tone for call in scored_calls]
+            "Date": [call.timestamp.strftime("%Y-%m-%d") if call.timestamp else "" for call in scored_calls],
+            "Total Score": [call.score.total for call in scored_calls if call.score and call.score.total is not None],
+            "Greeting": [call.score.greeting for call in scored_calls if call.score and call.score.greeting is not None],
+            "Resolution": [call.score.resolution for call in scored_calls if call.score and call.score.resolution is not None],
+            "Tone": [call.score.tone for call in scored_calls if call.score and call.score.tone is not None]
         }
         
-        df = pd.DataFrame(scores_data)
-        
-        st.subheader("Score Trends Over Time")
-        st.line_chart(df.set_index("Date")[["Total Score", "Greeting", "Resolution", "Tone"]])
+        # Ensure all lists have the same length
+        min_len = min(len(v) for v in scores_data.values() if v)
+        if min_len > 0:
+            scores_data = {k: v[:min_len] for k, v in scores_data.items()}
+            df = pd.DataFrame(scores_data)
+            
+            if not df.empty:
+                st.subheader("Score Trends Over Time")
+                st.line_chart(df.set_index("Date")[["Total Score", "Greeting", "Resolution", "Tone"]])
         
         # Average scores
         st.subheader("Average Scores by Metric")
+        hold_times = [call.score.hold_time for call in scored_calls if call.score and call.score.hold_time is not None]
+        compliances = [call.score.compliance for call in scored_calls if call.score and call.score.compliance is not None]
+        
         avg_scores = {
-            "Greeting": df["Greeting"].mean(),
-            "Hold Time": [call.score.hold_time for call in scored_calls],
-            "Resolution": df["Resolution"].mean(),
-            "Tone": df["Tone"].mean(),
-            "Compliance": [call.score.compliance for call in scored_calls]
+            "Greeting": sum([call.score.greeting for call in scored_calls if call.score and call.score.greeting is not None]) / len(scored_calls) if scored_calls else 0,
+            "Hold Time": sum(hold_times) / len(hold_times) if hold_times else 0,
+            "Resolution": sum([call.score.resolution for call in scored_calls if call.score and call.score.resolution is not None]) / len(scored_calls) if scored_calls else 0,
+            "Tone": sum([call.score.tone for call in scored_calls if call.score and call.score.tone is not None]) / len(scored_calls) if scored_calls else 0,
+            "Compliance": sum(compliances) / len(compliances) if compliances else 0
         }
         
         avg_df = pd.DataFrame({
             "Metric": ["Greeting", "Hold Time", "Resolution", "Tone", "Compliance"],
             "Average Score": [
                 avg_scores["Greeting"],
-                sum(avg_scores["Hold Time"]) / len(avg_scores["Hold Time"]) if avg_scores["Hold Time"] else 0,
+                avg_scores["Hold Time"],
                 avg_scores["Resolution"],
                 avg_scores["Tone"],
-                sum(avg_scores["Compliance"]) / len(avg_scores["Compliance"]) if avg_scores["Compliance"] else 0
+                avg_scores["Compliance"]
             ]
         })
         
