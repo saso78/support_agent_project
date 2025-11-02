@@ -1,11 +1,15 @@
 import os
-from typing import Dict
-from dotenv import load_dotenv
+from typing import Dict, Optional
 from dataclasses import dataclass
 
-load_dotenv()
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except ImportError:
+    # dotenv not available, continue without it
+    pass
 
-def get_secret(key: str, default=None):
+def get_secret(key: str, default: Optional[str] = None) -> Optional[str]:
     """
     Get secret from Streamlit secrets (cloud) or environment variables (local).
     
@@ -17,7 +21,7 @@ def get_secret(key: str, default=None):
         The secret value or default
     """
     try:
-        import streamlit as st
+        import streamlit as st  # type: ignore
         # Try Streamlit secrets first (cloud deployment)
         if key in st.secrets:
             return st.secrets[key]
@@ -84,6 +88,20 @@ def load_config() -> Config:
 
 # API Configuration - now reads from both .env and Streamlit secrets
 OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY")
+
+# Voice/Call Configuration - Call QA Tool
+TWILIO_ACCOUNT_SID = get_secret("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = get_secret("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = get_secret("TWILIO_PHONE_NUMBER")
+ELEVENLABS_API_KEY = get_secret("ELEVENLABS_API_KEY")
+DEEPGRAM_API_KEY = get_secret("DEEPGRAM_API_KEY")
+
+# Call QA Settings
+MAX_CALL_DURATION = 300  # 5 minutes
+CALL_TIMEOUT = 30  # seconds before giving up
+DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs voice
+_use_mock_apis_value = get_secret("USE_MOCK_APIS", "true")
+USE_MOCK_APIS = (_use_mock_apis_value or "true").lower() == "true"
 
 # Document Categories
 DOCUMENT_CATEGORIES = {

@@ -1,0 +1,689 @@
+# Call Center QA Tool - Cursor Build Prompt
+
+## Project Context
+
+I'm a QA Engineer/Support Manager building my second SaaS product. I have an existing Support Agent SaaS (Python, OpenRouter, ChromaDB RAG, Streamlit) that's deployed and working.
+
+**PROJECT:** Call Center QA Tool - Phase 1  
+An AI agent that makes outbound calls to test call center support agents, transcribes conversations, scores performance, and generates QA reports.
+
+**IMPORTANT:** This is being built as a NEW FEATURE BRANCH (`feature/call-qa-tool`) from my `develop` branch. It will extend my existing codebase, not replace it.
+
+---
+
+## My Existing Codebase Structure
+```
+support_agent_project/
+├── agents/
+│   ├── base_agent.py
+│   ├── support_agent.py
+│   ├── general_agent.py
+│   └── qa_evaluator.py
+├── core/
+│   ├── config.py (handles env + Streamlit secrets)
+│   ├── llm.py (OpenRouter integration)
+│   ├── memory.py (conversation history)
+│   ├── prompts.py (system prompts)
+│   └── rag.py (ChromaDB RAG system)
+├── tools/
+│   ├── rag_tools.py
+│   ├── file_tools.py
+│   ├── web_tools.py
+│   └── system_tools.py
+├── utils/
+│   └── usage_stats.py
+├── data/
+│   ├── rag_db/
+│   ├── chat_history/
+│   └── temp_uploads/
+├── app.py (Streamlit web UI)
+├── main.py (CLI interface)
+└── requirements.txt
+```
+
+---
+
+## Tech Stack Decisions
+
+I've already researched these options:
+
+- **Voice Calls:** Twilio (pay-as-you-go, $0.013/min)
+- **Text-to-Speech:** ElevenLabs API (natural voices, $0.30/1K chars)
+- **Speech-to-Text:** Deepgram (real-time, $0.0043/min)
+- **AI Logic:** OpenRouter (reuse existing setup)
+- **Evaluation:** Custom scoring engine + my existing `qa_evaluator.py`
+- **Database:** SQLite for call logs (simple, no extra cost)
+- **UI:** Streamlit (reuse existing UI patterns)
+
+---
+
+## New Features to Add
+
+### 1. Voice Infrastructure (`core/voice.py`)
+- Twilio integration for outbound calls
+- Call state management (dialing, in-progress, completed, failed)
+- Call recording and storage
+- Error handling and retries
+
+### 2. Transcription Engine (`core/transcription.py`)
+- Deepgram integration for real-time transcription
+- Speaker diarization (identify agent vs. customer)
+- Timestamp tracking for analysis
+- Confidence scores
+
+### 3. Evaluation System (`agents/call_qa_agent.py`)
+- Extends my existing `qa_evaluator.py`
+- Scores calls on:
+  * Greeting quality (0-10)
+  * Hold time management (0-10)
+  * Problem resolution (0-10)
+  * Tone/empathy (0-10)
+  * Script compliance (0-10)
+- Generates improvement recommendations
+- Detects common issues (long holds, poor tone, incorrect info)
+
+### 4. Call Scenarios (`data/call_scenarios/`)
+- JSON files with test scenarios
+- Example: "I need to cancel my subscription"
+- Expected agent responses
+- Pass/fail criteria
+
+### 5. Reporting Dashboard (`streamlit_pages/call_qa_dashboard.py`)
+- Call history table
+- Agent performance rankings
+- Trend charts (scores over time)
+- Export to PDF/CSV
+- Filter by date, agent, scenario
+
+### 6. Database (`core/database.py`)
+- SQLite schema for:
+  * `calls` (id, phone_number, duration, status, cost, timestamp)
+  * `transcripts` (call_id, speaker, text, timestamp, confidence)
+  * `scores` (call_id, greeting, hold_time, resolution, tone, compliance, total)
+  * `agents` (id, name, phone, average_score, total_calls)
+- CRUD operations
+- Query helpers
+
+---
+
+## Scoring Rubric
+
+Use this exact logic for evaluation:
+
+### Greeting Quality (0-10)
+- **10:** Professional greeting with company name + agent name
+- **7-9:** Greeting with one element missing
+- **4-6:** Generic greeting ("Hello?")
+- **0-3:** No greeting or unprofessional
+
+### Hold Time (0-10)
+- **10:** No hold or <30 seconds with explanation
+- **7-9:** 30-60 seconds with explanation
+- **4-6:** 60-120 seconds or no explanation
+- **0-3:** >120 seconds or hang-up
+
+### Problem Resolution (0-10)
+- **10:** Issue fully resolved, confirmation provided
+- **7-9:** Resolved but missing confirmation
+- **4-6:** Partial resolution, requires callback
+- **0-3:** Not resolved, incorrect information
+
+### Tone/Empathy (0-10)
+- Use sentiment analysis on transcript
+- **10:** Consistently positive, empathetic language
+- **7-9:** Professional but neutral
+- **4-6:** Occasionally short or impatient
+- **0-3:** Rude, dismissive, or hostile
+
+### Script Compliance (0-10)
+- Check for required phrases (configurable per company)
+- **10:** All required elements present
+- **5:** 50% of elements present
+- **0:** No script elements detected
+
+---
+
+## MVP Scope
+
+### MUST HAVE (Phase 1):
+- ✅ Make a single outbound call via Twilio
+- ✅ Use ElevenLabs to generate realistic customer voice
+- ✅ Transcribe call with Deepgram
+- ✅ Score the call using rubric above
+- ✅ Store call + transcript + scores in SQLite
+- ✅ Display results in Streamlit dashboard
+- ✅ One test scenario: "Cancel subscription"
+
+### NICE TO HAVE (Phase 2 - Future):
+- ⏸ Multiple concurrent calls
+- ⏸ Scheduled recurring calls
+- ⏸ Email reports to managers
+- ⏸ Integration with existing call center software
+- ⏸ Custom rubric builder
+
+---
+
+## Code Requirements
+
+### 1. Reuse Existing Patterns
+- Follow my `core/config.py` pattern (env + Streamlit secrets)
+- Use same error handling as `core/llm.py`
+- Agent classes inherit from `agents/base_agent.py`
+- Configuration in `core/config.py`
+- All API keys in environment variables
+
+### 2. Code Style
+- Type hints everywhere
+- Docstrings for all classes/methods
+- Error handling with try/except and logging
+- No print statements (use logging module)
+- Keep functions small (<50 lines)
+- Clear variable names
+
+### 3. Configuration Updates
+
+Add these to `core/config.py`:
+```python
+# Voice/Call Configuration
+TWILIO_ACCOUNT_SID = get_secret("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = get_secret("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = get_secret("TWILIO_PHONE_NUMBER")
+ELEVENLABS_API_KEY = get_secret("ELEVENLABS_API_KEY")
+DEEPGRAM_API_KEY = get_secret("DEEPGRAM_API_KEY")
+
+# Call QA Settings
+MAX_CALL_DURATION = 300  # 5 minutes
+CALL_TIMEOUT = 30  # seconds before giving up
+DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs voice
+USE_MOCK_APIS = get_secret("USE_MOCK_APIS", "true").lower() == "true"
+```
+
+### 4. Database Schema
+
+Use SQLAlchemy ORM (add to requirements.txt).  
+Create models in `core/models.py`.
+
+### 5. Testing Structure
+```
+tests/
+├── test_voice.py          # Mock Twilio calls
+├── test_transcription.py  # Mock Deepgram
+├── test_evaluation.py     # Test scoring logic
+└── test_database.py       # Test CRUD operations
+```
+
+---
+
+## Requirements.txt Additions
+```
+twilio==8.10.0
+elevenlabs==0.2.26
+deepgram-sdk==3.2.0
+sqlalchemy==2.0.23
+pydub==0.25.1
+pytest==7.4.3
+pytest-mock==3.12.0
+pytest-cov==4.1.0
+```
+
+---
+
+## File Structure to Create
+```
+support_agent_project/
+├── agents/
+│   └── call_qa_agent.py ⭐ NEW
+├── core/
+│   ├── voice.py ⭐ NEW (Twilio integration)
+│   ├── transcription.py ⭐ NEW (Deepgram)
+│   ├── database.py ⭐ NEW (SQLite operations)
+│   ├── models.py ⭐ NEW (SQLAlchemy models)
+│   └── config.py ✏️ UPDATE (add new settings)
+├── data/
+│   ├── call_scenarios/
+│   │   └── cancel_subscription.json ⭐ NEW
+│   ├── call_logs/ ⭐ NEW (store recordings)
+│   └── call_qa.db ⭐ NEW (SQLite database)
+├── streamlit_pages/
+│   └── call_qa_dashboard.py ⭐ NEW
+├── tests/
+│   ├── test_voice.py ⭐ NEW
+│   ├── test_transcription.py ⭐ NEW
+│   ├── test_evaluation.py ⭐ NEW
+│   └── test_database.py ⭐ NEW
+├── scripts/
+│   └── run_test_call.py ⭐ NEW (CLI to trigger test call)
+├── docs/
+│   ├── call-qa-architecture.md ⭐ NEW
+│   └── scoring-rubric.md ⭐ NEW
+├── requirements.txt ✏️ UPDATE
+└── README.md ✏️ UPDATE
+```
+
+---
+
+## Implementation Constraints
+
+### 1. Mock Mode for Testing
+Add `USE_MOCK_APIS` flag to config:
+- **When True:** Use fake data, no real API calls, no costs
+- **When False:** Use real Twilio/ElevenLabs/Deepgram
+
+### 2. Cost Tracking
+Track estimated costs for each call:
+- Twilio: $0.013/min
+- ElevenLabs: $0.30/1K chars
+- Deepgram: $0.0043/min  
+Store in database for billing reports.
+
+### 3. Error Handling
+- Retry logic for failed calls (max 3 attempts)
+- Graceful degradation if TTS/STT fails
+- Save partial transcripts if call drops
+- Log all errors to file
+
+### 4. Security
+- Never log API keys or phone numbers in full
+- Sanitize phone numbers in database
+- Comply with call recording laws (add consent message)
+
+---
+
+## Example Call Scenario File
+
+`data/call_scenarios/cancel_subscription.json`:
+```json
+{
+  "id": "cancel_subscription",
+  "name": "Cancel Subscription Request",
+  "description": "Customer wants to cancel their subscription",
+  "customer_script": [
+    "Hi, I'd like to cancel my subscription please.",
+    "I'm not using the service anymore.",
+    "Yes, please proceed with the cancellation.",
+    "Thank you."
+  ],
+  "expected_agent_behavior": {
+    "greeting": "Should greet with company name and agent name",
+    "retention_attempt": "Should ask why customer is canceling",
+    "process": "Should explain cancellation process clearly",
+    "confirmation": "Should provide cancellation confirmation number"
+  },
+  "scoring_weights": {
+    "greeting": 1.0,
+    "hold_time": 0.5,
+    "resolution": 2.0,
+    "tone": 1.5,
+    "compliance": 1.0
+  }
+}
+```
+
+---
+
+## Cursor Instructions
+
+### PHASE 1 - Architecture (Do this first)
+
+Using **Cursor Chat (Cmd/Ctrl+L)**, generate:
+
+1. Review my existing codebase structure
+2. Create detailed architecture document (`docs/call-qa-architecture.md`)
+3. Explain how new components integrate with existing code
+4. List potential conflicts or issues
+5. Create system architecture diagram (ASCII art or Mermaid)
+6. Document data flow: Call initiation → Transcription → Scoring → Storage → Display
+
+**Wait for my approval before proceeding to Phase 2.**
+
+---
+
+### PHASE 2 - Code Generation
+
+Using **Cursor Composer (Cmd/Ctrl+I)**, generate all files:
+
+1. ✅ `core/models.py` - SQLAlchemy models
+2. ✅ `core/database.py` - Database operations
+3. ✅ `core/voice.py` - Twilio integration
+4. ✅ `core/transcription.py` - Deepgram integration
+5. ✅ `agents/call_qa_agent.py` - Evaluation logic
+6. ✅ `data/call_scenarios/cancel_subscription.json` - Test scenario
+7. ✅ `streamlit_pages/call_qa_dashboard.py` - Dashboard UI
+8. ✅ `scripts/run_test_call.py` - CLI test script
+9. ✅ Update `core/config.py` with new settings
+10. ✅ Update `requirements.txt` with new dependencies
+
+**Requirements for each file:**
+- Complete implementations (no TODO comments)
+- Full error handling with logging
+- Type hints on all functions
+- Docstrings for all classes and public methods
+- Mock mode support (`USE_MOCK_APIS` flag)
+- Cost tracking for API calls
+- Follow existing code patterns from my codebase
+
+---
+
+### PHASE 3 - Testing Setup
+
+Using **Cursor Chat (Cmd/Ctrl+L)**, generate test files:
+
+1. `tests/test_voice.py` - Test Twilio calls with mocked responses
+2. `tests/test_transcription.py` - Test Deepgram with sample audio
+3. `tests/test_evaluation.py` - Test scoring logic with sample transcripts
+4. `tests/test_database.py` - Test all CRUD operations
+5. `tests/conftest.py` - Pytest fixtures for shared test data
+
+**Include:**
+- Mock API responses (no real API calls in tests)
+- Sample call transcripts for testing scoring
+- Edge cases (failed calls, poor audio quality, low scores)
+- Database fixtures with sample data
+- Target: 80%+ code coverage
+
+---
+
+### PHASE 4 - Documentation
+
+Using **Cursor Chat (Cmd/Ctrl+L)**, generate documentation:
+
+1. **Update `README.md`** with:
+   - Call QA Tool section
+   - Setup instructions (API keys, database init)
+   - Usage examples (CLI + UI)
+   - Architecture overview
+
+2. **Create `docs/call-qa-architecture.md`:**
+   - System architecture diagram
+   - Component descriptions
+   - API integration details
+   - Data flow diagrams
+
+3. **Create `docs/scoring-rubric.md`:**
+   - Detailed scoring criteria
+   - Examples of good vs. bad calls
+   - How to customize rubric
+
+4. **Create `.env.example`:**
+```
+   # Existing keys
+   OPENROUTER_API_KEY=sk-or-v1-xxx
+   
+   # New Call QA keys
+   TWILIO_ACCOUNT_SID=ACxxx
+   TWILIO_AUTH_TOKEN=xxx
+   TWILIO_PHONE_NUMBER=+1234567890
+   ELEVENLABS_API_KEY=xxx
+   DEEPGRAM_API_KEY=xxx
+   
+   # Settings
+   USE_MOCK_APIS=true
+```
+
+5. Add inline code comments to complex functions
+
+---
+
+## Git Workflow
+
+### Before Starting:
+```bash
+# Make sure you're on develop branch
+git checkout develop
+git pull origin develop
+
+# Create feature branch
+git checkout -b feature/call-qa-tool
+
+# Confirm you're on the new branch
+git branch
+```
+
+### During Development:
+
+Commit after each phase:
+```bash
+# After Phase 1
+git add docs/call-qa-architecture.md
+git commit -m "docs: Add Call QA Tool architecture documentation"
+
+# After Phase 2
+git add agents/call_qa_agent.py core/voice.py core/transcription.py core/database.py core/models.py
+git add streamlit_pages/call_qa_dashboard.py scripts/run_test_call.py
+git add data/call_scenarios/cancel_subscription.json
+git add core/config.py requirements.txt
+git commit -m "feat: Implement Call QA Tool core functionality
+
+- Add Twilio voice integration
+- Add Deepgram transcription engine
+- Add call evaluation agent with scoring rubric
+- Add SQLite database with SQLAlchemy models
+- Add Streamlit dashboard for call QA reports
+- Add CLI script for testing calls
+- Update config with new API settings"
+
+# After Phase 3
+git add tests/
+git commit -m "test: Add comprehensive test suite for Call QA Tool
+
+- Add voice integration tests with mocked Twilio
+- Add transcription tests with mocked Deepgram
+- Add evaluation logic tests with sample data
+- Add database CRUD tests
+- Achieve 80%+ code coverage"
+
+# After Phase 4
+git add README.md docs/ .env.example
+git commit -m "docs: Add Call QA Tool documentation
+
+- Update README with setup instructions
+- Add architecture documentation
+- Add scoring rubric guide
+- Add .env.example with all required keys"
+```
+
+### Testing Before Merge:
+```bash
+# Install new dependencies
+pip install -r requirements.txt
+
+# Set up test environment
+cp .env.example .env
+# Edit .env: Set USE_MOCK_APIS=true
+
+# Initialize database
+python -c "from core.database import init_db; init_db()"
+
+# Run tests
+pytest tests/ -v --cov=. --cov-report=html
+
+# Test CLI
+python scripts/run_test_call.py --scenario cancel_subscription
+
+# Test Dashboard
+streamlit run streamlit_pages/call_qa_dashboard.py
+
+# If everything works, proceed to merge
+```
+
+### Merging to Develop:
+```bash
+# Push feature branch
+git push origin feature/call-qa-tool
+
+# Switch to develop
+git checkout develop
+
+# Merge feature branch
+git merge feature/call-qa-tool --no-ff
+
+# Create merge commit message:
+```
+
+**Merge commit message:**
+```
+Merge feature/call-qa-tool into develop
+
+Add Call Center QA Tool functionality:
+- Twilio integration for outbound test calls
+- ElevenLabs TTS for realistic customer voice
+- Deepgram STT for call transcription
+- Automated call scoring with 5-metric rubric
+- SQLite database for call logs and analytics
+- Streamlit dashboard for QA reporting
+- CLI tool for manual testing
+- Comprehensive test suite (80%+ coverage)
+- Mock mode for cost-free development
+
+This feature extends the existing Support Agent SaaS with
+call center quality assurance capabilities. All new code
+follows existing patterns and integrates cleanly with
+current architecture.
+
+Ready for internal testing and validation.
+```
+```bash
+# Push to develop
+git push origin develop
+
+# Optional: Tag this release
+git tag -a v0.2.0-call-qa-mvp -m "Call QA Tool MVP - Ready for testing"
+git push origin v0.2.0-call-qa-mvp
+
+# Optional: Delete feature branch (after successful merge)
+git branch -d feature/call-qa-tool
+git push origin --delete feature/call-qa-tool
+```
+
+---
+
+## Testing Checklist
+
+Before merging to `develop`, verify:
+
+- [ ] All tests pass (`pytest tests/`)
+- [ ] Code coverage is 80%+ (`pytest --cov`)
+- [ ] Mock mode works (no API calls during testing)
+- [ ] CLI script runs successfully
+- [ ] Streamlit dashboard loads without errors
+- [ ] Database initializes correctly
+- [ ] Config reads all new environment variables
+- [ ] No hardcoded credentials anywhere
+- [ ] All new files follow existing code style
+- [ ] Documentation is complete and accurate
+- [ ] `.env.example` includes all required keys
+- [ ] No merge conflicts with `develop` branch
+
+---
+
+## Post-Merge Next Steps
+
+After successful merge to `develop`:
+
+1. **Deploy to testing environment:**
+   - Create Streamlit Cloud app from `develop` branch
+   - Name it: `support-agent-dev` (already exists, will auto-update)
+   - Add new secrets (Twilio, ElevenLabs, Deepgram)
+   - Keep `USE_MOCK_APIS=true` initially
+
+2. **Internal testing (1-2 weeks):**
+   - Test with mock mode
+   - Validate all features work
+   - Fix any bugs found
+   - Gather team feedback
+
+3. **Real API testing (with budget):**
+   - Set `USE_MOCK_APIS=false`
+   - Allocate $50 for testing
+   - Make 10-20 real test calls
+   - Validate transcription accuracy
+   - Confirm scoring logic works
+   - Calculate actual costs per call
+
+4. **Customer validation:**
+   - Find 1 pilot customer (call center manager)
+   - Offer free trial for 1 month
+   - Run 50-100 test calls
+   - Gather feedback
+   - Calculate ROI for them
+
+5. **Production merge:**
+   - After validation, merge `develop` → `main`
+   - Deploy production version
+   - Start charging customers
+
+---
+
+## Expected Timeline
+
+| Phase | Cursor Time | Your Time | Description |
+|-------|-------------|-----------|-------------|
+| **Architecture** | 5 min | 30 min | Review plan, ask questions |
+| **Code Generation** | 10 min | 1 hour | Review code, test locally |
+| **Test Generation** | 5 min | 30 min | Review tests, run suite |
+| **Documentation** | 5 min | 30 min | Review docs, update as needed |
+| **Testing & Debug** | - | 2-3 hours | Fix issues, manual testing |
+| **Total** | ~25 min | ~5 hours | From prompt to working MVP |
+
+---
+
+## Success Criteria
+
+This feature is complete when:
+
+✅ All code is generated and committed  
+✅ All tests pass with 80%+ coverage  
+✅ Mock mode works (no API costs during dev)  
+✅ Can make 1 test call and see results in dashboard  
+✅ Database stores call data correctly  
+✅ Dashboard displays scores and analytics  
+✅ Documentation is complete  
+✅ Successfully merged to `develop` branch  
+✅ Team can access and test via Streamlit Cloud  
+
+---
+
+## Support & Troubleshooting
+
+If you encounter issues:
+
+1. **Cursor generation errors:**
+   - Try breaking down the request into smaller parts
+   - Regenerate specific files individually
+   - Ask Cursor to explain its approach first
+
+2. **Import errors:**
+   - Verify all dependencies in `requirements.txt`
+   - Check Python path includes project root
+   - Ensure `__init__.py` exists where needed
+
+3. **Database errors:**
+   - Delete `data/call_qa.db` and reinitialize
+   - Check SQLAlchemy model definitions
+   - Verify database path in config
+
+4. **API integration issues:**
+   - Start with mock mode (`USE_MOCK_APIS=true`)
+   - Test each API separately
+   - Check API key format and permissions
+   - Review API error messages in logs
+
+5. **Test failures:**
+   - Run tests individually: `pytest tests/test_voice.py -v`
+   - Check mock setup in `conftest.py`
+   - Verify test data fixtures
+
+---
+
+## Notes
+
+- This prompt is designed for **Cursor IDE** with Claude/GPT-4
+- All generated code will follow your existing patterns
+- Mock mode allows development without API costs
+- Feature branch keeps `develop` stable during development
+- Comprehensive testing ensures quality before merge
+- Documentation generated alongside code
+
+---
+
+**Ready to start? Open Cursor, create your feature branch, and paste Phase 1 into Cursor Chat!**

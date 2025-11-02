@@ -1,0 +1,25 @@
+{
+  "id": "cancel_subscription",
+  "name": "Cancel Subscription Request",
+  "description": "Customer wants to cancel their subscription",
+  "customer_script": [
+    "Hi, I'd like to cancel my subscription please.",
+    "I'm not using the service anymore.",
+    "Yes, please proceed with the cancellation.",
+    "Thank you."
+  ],
+  "expected_agent_behavior": {
+    "greeting": "Should greet with company name and agent name",
+    "retention_attempt": "Should ask why customer is canceling",
+    "process": "Should explain cancellation process clearly",
+    "confirmation": "Should provide cancellation confirmation number"
+  },
+  "scoring_weights": {
+    "greeting": 1.0,
+    "hold_time": 0.5,
+    "resolution": 2.0,
+    "tone": 1.5,
+    "compliance": 1.0
+  }
+}
+
