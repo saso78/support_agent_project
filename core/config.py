@@ -85,6 +85,19 @@ def load_config() -> Config:
 # API Configuration - now reads from both .env and Streamlit secrets
 OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY")
 
+# Voice/Call Configuration - Call QA Tool
+TWILIO_ACCOUNT_SID = get_secret("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = get_secret("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = get_secret("TWILIO_PHONE_NUMBER")
+ELEVENLABS_API_KEY = get_secret("ELEVENLABS_API_KEY")
+DEEPGRAM_API_KEY = get_secret("DEEPGRAM_API_KEY")
+
+# Call QA Settings
+MAX_CALL_DURATION = 300  # 5 minutes
+CALL_TIMEOUT = 30  # seconds before giving up
+DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs voice
+USE_MOCK_APIS = get_secret("USE_MOCK_APIS", "true").lower() == "true"
+
 # Document Categories
 DOCUMENT_CATEGORIES = {
     "manual": "Product Manuals",
