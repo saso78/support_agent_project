@@ -3,7 +3,7 @@ import requests
 import json
 import time
 from abc import ABC, abstractmethod
-from .config import OPENROUTER_API_KEY, MODELS, DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
+from .config import get_secret, MODELS, DEFAULT_MAX_TOKENS, DEFAULT_TEMPERATURE
 
 class LLMInterface(ABC):
     @abstractmethod
@@ -17,9 +17,14 @@ class LLMInterface(ABC):
 class OpenRouterLLM(LLMInterface):
     def __init__(self, api_key: str = "") -> None:
         """Initialize with API key, defaulting to config value if not provided."""
-        self.api_key = api_key or OPENROUTER_API_KEY
+        # ⭐ Load API key lazily using get_secret()
+        self.api_key = api_key or get_secret("OPENROUTER_API_KEY")
+        
         if not self.api_key:
-            raise ValueError("API key is required but none was provided")
+            raise ValueError(
+                "API key is required but none was provided. "
+                "Please set OPENROUTER_API_KEY in your .env file or Streamlit secrets."
+            )
             
         self.base_url = "https://openrouter.ai/api/v1/chat/completions"
         self.headers = {

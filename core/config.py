@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from dataclasses import dataclass
 
 try:
@@ -23,9 +23,11 @@ def get_secret(key: str, default: Optional[str] = None) -> Optional[str]:
     try:
         import streamlit as st  # type: ignore
         # Try Streamlit secrets first (cloud deployment)
-        if key in st.secrets:
+        # Check if secrets are available and initialized
+        if hasattr(st, 'secrets') and key in st.secrets:
             return st.secrets[key]
-    except (ImportError, FileNotFoundError, AttributeError):
+    except (ImportError, FileNotFoundError, AttributeError, RuntimeError):
+        # RuntimeError occurs when secrets aren't initialized yet
         pass
     
     # Fall back to environment variable (local development)
@@ -60,7 +62,9 @@ class Config:
 
 def load_config() -> Config:
     """Load and return the configuration."""
-    api_key = OPENROUTER_API_KEY
+    # ⭐ Load API key here (when function is called), not at module level
+    api_key = get_secret("OPENROUTER_API_KEY")
+    
     if not api_key:
         raise ValueError(
             "OPENROUTER_API_KEY not found in environment. "
@@ -85,23 +89,6 @@ def load_config() -> Config:
         manuals_dir=MANUALS_DIR,
         DOCUMENT_CATEGORIES=DOCUMENT_CATEGORIES
     )
-
-# API Configuration - now reads from both .env and Streamlit secrets
-OPENROUTER_API_KEY = get_secret("OPENROUTER_API_KEY")
-
-# Voice/Call Configuration - Call QA Tool
-TWILIO_ACCOUNT_SID = get_secret("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = get_secret("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE_NUMBER = get_secret("TWILIO_PHONE_NUMBER")
-ELEVENLABS_API_KEY = get_secret("ELEVENLABS_API_KEY")
-DEEPGRAM_API_KEY = get_secret("DEEPGRAM_API_KEY")
-
-# Call QA Settings
-MAX_CALL_DURATION = 300  # 5 minutes
-CALL_TIMEOUT = 30  # seconds before giving up
-DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs voice
-_use_mock_apis_value = get_secret("USE_MOCK_APIS", "true")
-USE_MOCK_APIS = (_use_mock_apis_value or "true").lower() == "true"
 
 # Document Categories
 DOCUMENT_CATEGORIES = {
@@ -132,6 +119,11 @@ COLLECTION_NAME = "pdf_knowledge"
 CHUNK_SIZE = 1000  # Increased chunk size for better context
 CHUNK_OVERLAP = 200  # Increased overlap for better continuity
 
+# Call QA Settings
+MAX_CALL_DURATION = 300  # 5 minutes
+CALL_TIMEOUT = 30  # seconds before giving up
+DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs voice
+
 # System prompts
 SYSTEM_PROMPTS: Dict[str, str] = {
     "default": "You are a helpful AI assistant. Always reply in complete sentences.",
@@ -155,3 +147,23 @@ MANUALS_DIR = os.path.join('data', 'manuals')
 for directory in [RAG_DB_DIR, os.path.dirname(HISTORY_FILE), 
                  TEMP_UPLOADS_DIR, KB_ARTICLES_DIR, MANUALS_DIR]:
     os.makedirs(directory, exist_ok=True)
+
+# ⭐ Helper functions to get Call QA config lazily
+def get_call_qa_config() -> Dict[str, Any]:
+    """
+    Load Call QA specific configuration.
+    Call this function when you need Call QA settings.
+    """
+    _use_mock_apis_value = get_secret("USE_MOCK_APIS", "true")
+    
+    return {
+        'TWILIO_ACCOUNT_SID': get_secret("TWILIO_ACCOUNT_SID"),
+        'TWILIO_AUTH_TOKEN': get_secret("TWILIO_AUTH_TOKEN"),
+        'TWILIO_PHONE_NUMBER': get_secret("TWILIO_PHONE_NUMBER"),
+        'ELEVENLABS_API_KEY': get_secret("ELEVENLABS_API_KEY"),
+        'DEEPGRAM_API_KEY': get_secret("DEEPGRAM_API_KEY"),
+        'USE_MOCK_APIS': (_use_mock_apis_value or "true").lower() == "true",
+        'MAX_CALL_DURATION': MAX_CALL_DURATION,
+        'CALL_TIMEOUT': CALL_TIMEOUT,
+        'DEFAULT_VOICE_ID': DEFAULT_VOICE_ID
+    }
